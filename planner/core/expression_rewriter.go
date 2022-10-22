@@ -1537,7 +1537,9 @@ func (er *expressionRewriter) handleMatchAgainst(expr *ast.MatchAgainst) {
 	fields := er.ctxStack[stkLen-exprLen : stkLen-1]
 	pattern := er.ctxStack[stkLen-1]
 
-	var function expression.Expression
+	var (
+		function expression.Expression
+	)
 	patternStr := pattern.(*expression.Constant).Value.GetString()
 	if expr.Modifier.IsBooleanMode() {
 		andTree := make([]expression.Expression, 0, len(fields))
@@ -1571,26 +1573,25 @@ func (er *expressionRewriter) handleMatchAgainst(expr *ast.MatchAgainst) {
 			andTree = append(andTree, expression.ComposeCNFCondition(er.sctx, eqFunctions...))
 		}
 		function = expression.ComposeDNFCondition(er.sctx, andTree...)
-	} else {
+	} else if expr.Modifier.IsNaturalLanguageMode() {
+		// isExpansion := expr.Modifier.WithQueryExpansion()
 		segItems := parser.Jieba.Cut(patternStr, true)
-		if expr.Modifier.IsNaturalLanguageMode() {
-			eqFunctions := make([]expression.Expression, 0, (exprLen-1)*len(segItems))
-			for _, field := range fields {
-				for _, segItem := range segItems {
-					patternExpr := &expression.Constant{
-						Value:   types.NewStringDatum(segItem),
-						RetType: pattern.(*expression.Constant).RetType,
-					}
-					expr, err := er.constructBinaryOpFunction(field, patternExpr, ast.EQ)
-					if err != nil {
-						er.err = err
-						return
-					}
-					eqFunctions = append(eqFunctions, expr)
+		eqFunctions := make([]expression.Expression, 0, (exprLen-1)*len(segItems))
+		for _, field := range fields {
+			for _, segItem := range segItems {
+				patternExpr := &expression.Constant{
+					Value:   types.NewStringDatum(segItem),
+					RetType: pattern.(*expression.Constant).RetType,
 				}
+				expr, err := er.constructBinaryOpFunction(field, patternExpr, ast.EQ)
+				if err != nil {
+					er.err = err
+					return
+				}
+				eqFunctions = append(eqFunctions, expr)
 			}
-			function = expression.ComposeDNFCondition(er.sctx, eqFunctions...)
 		}
+		function = expression.ComposeDNFCondition(er.sctx, eqFunctions...)
 	}
 	er.ctxStackPop(exprLen)
 	er.ctxStackAppend(function, types.EmptyName)
