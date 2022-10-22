@@ -27,7 +27,7 @@ func Cutl(sentence string) []string {
 func loadStopWords() map[string]interface{} {
 	set := make(map[string]interface{})
 
-	f, err := os.Open("stops.txt")
+	f, err := os.Open("/home/dousir9/TiDB-Hackathon/tidb_hackathon_2022/parser/stops.txt")
 	if err != nil {
 		panic("can't open file stops.txt")
 	}
