@@ -1867,10 +1867,15 @@ func BuildTableInfo(
 			}
 		}
 
+		var (
+			fulltext bool
+		)
 		if constr.Tp == ast.ConstraintFulltext {
-			ctx.GetSessionVars().StmtCtx.AppendWarning(dbterror.ErrTableCantHandleFt.GenWithStackByArgs())
-			continue
+			fulltext = true
+			// ctx.GetSessionVars().StmtCtx.AppendWarning(dbterror.ErrTableCantHandleFt.GenWithStackByArgs())
+			// continue
 		}
+		// fmt.Printf("		[BuildTableInfo] fulltext = %v\n", fulltext)
 		if constr.Tp == ast.ConstraintCheck {
 			ctx.GetSessionVars().StmtCtx.AppendWarning(dbterror.ErrUnsupportedConstraintCheck.GenWithStackByArgs("CONSTRAINT CHECK"))
 			continue
@@ -1897,6 +1902,7 @@ func BuildTableInfo(
 			tbInfo.Columns,
 			model.NewCIStr(indexName),
 			primary,
+			fulltext,
 			unique,
 			false,
 			constr.Keys,
@@ -1953,7 +1959,7 @@ func addIndexForForeignKey(ctx sessionctx.Context, tbInfo *model.TableInfo) erro
 				Length: types.UnspecifiedLength,
 			})
 		}
-		idxInfo, err := BuildIndexInfo(ctx, tbInfo.Columns, idxName, false, false, false, keys, nil, model.StatePublic)
+		idxInfo, err := BuildIndexInfo(ctx, tbInfo.Columns, idxName, false, false, false, false, keys, nil, model.StatePublic)
 		if err != nil {
 			return errors.Trace(err)
 		}
@@ -6000,9 +6006,11 @@ func (d *ddl) CreateIndex(ctx sessionctx.Context, stmt *ast.CreateIndexStmt) err
 func (d *ddl) createIndex(ctx sessionctx.Context, ti ast.Ident, keyType ast.IndexKeyType, indexName model.CIStr,
 	indexPartSpecifications []*ast.IndexPartSpecification, indexOption *ast.IndexOption, ifNotExists bool) error {
 	// not support Spatial and FullText index
-	if keyType == ast.IndexKeyTypeFullText || keyType == ast.IndexKeyTypeSpatial {
+	if keyType == ast.IndexKeyTypeSpatial {
 		return dbterror.ErrUnsupportedIndexType.GenWithStack("FULLTEXT and SPATIAL index is not supported")
 	}
+	fulltext := keyType == ast.IndexKeyTypeFullText
+	// fmt.Printf("fulltext = %v\n", fulltext)
 	unique := keyType == ast.IndexKeyTypeUnique
 	schema, t, err := d.getSchemaAndTableByIdent(ctx, ti)
 	if err != nil {
@@ -6101,7 +6109,7 @@ func (d *ddl) createIndex(ctx sessionctx.Context, ti ast.Ident, keyType ast.Inde
 			WarningsCount: make(map[errors.ErrorID]int64),
 			Location:      &model.TimeZoneLocation{Name: tzName, Offset: tzOffset},
 		},
-		Args:     []interface{}{unique, indexName, indexPartSpecifications, indexOption, hiddenCols, global},
+		Args:     []interface{}{fulltext, unique, indexName, indexPartSpecifications, indexOption, hiddenCols, global},
 		Priority: ctx.GetSessionVars().DDLReorgPriority,
 	}
 
