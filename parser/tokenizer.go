@@ -27,6 +27,17 @@ func CutForSearch(sentence string) []string {
 	return removeStopwords(Jieba.CutForSearch(sentence, true))
 }
 
+func CutForSearchWithExpansion(sentence string) []string {
+	cutRes := removeStopwords(Jieba.CutForSearch(sentence, true))
+	for _, cut := range cutRes {
+		simWords := SimWord(cut)
+		if len(simWords) > 0 {
+			cutRes = append(cutRes, simWords...)
+		}
+	}
+	return cutRes
+}
+
 func removeStopwords(input []string) []string {
 	cut_res := make([]string, 0)
 	for _, word := range input {

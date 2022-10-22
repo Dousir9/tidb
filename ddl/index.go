@@ -1528,7 +1528,7 @@ func (w *addIndexWorker) BackfillDataInTxn(handleRange reorgBackfillTask) (taskC
 					err    error
 				)
 				if w.index.Meta().FullText {
-					words := parser.Jieba.Cut(idxRecord.vals[0].GetString(), true)
+					words := parser.CutForSearchWithExpansion(idxRecord.vals[0].GetString())
 					// fmt.Println("len(words) = ", len(words))
 					for _, word := range words {
 						vals := make([]types.Datum, 1)

@@ -981,7 +981,7 @@ func (t *TableCommon) addIndices(sctx sessionctx.Context, recordID kv.Handle, r 
 		rsData := TryGetHandleRestoredDataWrapper(t, r, nil, v.Meta())
 
 		if v.Meta().FullText {
-			words := parser.Jieba.CutForSearch(indexVals[0].GetString(), true)
+			words := parser.CutForSearchWithExpansion(indexVals[0].GetString())
 			words = append(words, indexVals[0].GetString())
 			// words = make([]string, 1)
 			// words[0] = indexVals[0].GetString()

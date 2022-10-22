@@ -1575,8 +1575,12 @@ func (er *expressionRewriter) handleMatchAgainst(expr *ast.MatchAgainst) {
 		}
 		function = expression.ComposeDNFCondition(er.sctx, andTree...)
 	} else {
-		// isExpansion := expr.Modifier.WithQueryExpansion()
-		segItems := parser.CutForSearch(patternStr)
+		var segItems []string
+		if !expr.Modifier.WithQueryExpansion() {
+			segItems = parser.CutForSearch(patternStr)
+		} else {
+			segItems = parser.CutForSearchWithExpansion(patternStr)
+		}
 		fmt.Println(len(segItems), segItems)
 		eqFunctions := make([]expression.Expression, 0, (exprLen-1)*len(segItems))
 		for _, field := range fields {
