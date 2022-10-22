@@ -34,6 +34,7 @@ import (
 	"github.com/pingcap/tidb/meta"
 	"github.com/pingcap/tidb/meta/autoid"
 	"github.com/pingcap/tidb/metrics"
+	"github.com/pingcap/tidb/parser"
 	"github.com/pingcap/tidb/parser/ast"
 	"github.com/pingcap/tidb/parser/charset"
 	"github.com/pingcap/tidb/parser/model"
@@ -252,6 +253,7 @@ func BuildIndexInfo(
 	allTableColumns []*model.ColumnInfo,
 	indexName model.CIStr,
 	isPrimary bool,
+	isFullText bool,
 	isUnique bool,
 	isGlobal bool,
 	indexPartSpecifications []*ast.IndexPartSpecification,
@@ -269,12 +271,13 @@ func BuildIndexInfo(
 
 	// Create index info.
 	idxInfo := &model.IndexInfo{
-		Name:    indexName,
-		Columns: idxColumns,
-		State:   state,
-		Primary: isPrimary,
-		Unique:  isUnique,
-		Global:  isGlobal,
+		Name:     indexName,
+		Columns:  idxColumns,
+		State:    state,
+		FullText: isFullText,
+		Primary:  isPrimary,
+		Unique:   isUnique,
+		Global:   isGlobal,
 	}
 
 	if indexOption != nil {
@@ -513,6 +516,7 @@ func (w *worker) onCreateIndex(d *ddlCtx, t *meta.Meta, job *model.Job, isPK boo
 	}
 
 	var (
+		fulltext                bool
 		unique                  bool
 		global                  bool
 		indexName               model.CIStr
@@ -524,14 +528,15 @@ func (w *worker) onCreateIndex(d *ddlCtx, t *meta.Meta, job *model.Job, isPK boo
 	)
 	if isPK {
 		// Notice: sqlMode and warnings is used to support non-strict mode.
-		err = job.DecodeArgs(&unique, &indexName, &indexPartSpecifications, &indexOption, &sqlMode, &warnings, &global)
+		err = job.DecodeArgs(&fulltext, &unique, &indexName, &indexPartSpecifications, &indexOption, &sqlMode, &warnings, &global)
 	} else {
-		err = job.DecodeArgs(&unique, &indexName, &indexPartSpecifications, &indexOption, &hiddenCols, &global)
+		err = job.DecodeArgs(&fulltext, &unique, &indexName, &indexPartSpecifications, &indexOption, &hiddenCols, &global)
 	}
 	if err != nil {
 		job.State = model.JobStateCancelled
 		return ver, errors.Trace(err)
 	}
+	// fmt.Printf("decode fulltext = %v\n", fulltext)
 
 	indexInfo := tblInfo.FindIndexByName(indexName.L)
 	if indexInfo != nil && indexInfo.State == model.StatePublic {
@@ -555,6 +560,7 @@ func (w *worker) onCreateIndex(d *ddlCtx, t *meta.Meta, job *model.Job, isPK boo
 		}
 	}
 
+	// fmt.Printf("		[onCreateIndex] indexInfo == nil: %v\n", indexInfo == nil)
 	if indexInfo == nil {
 		if len(hiddenCols) > 0 {
 			for _, hiddenCol := range hiddenCols {
@@ -570,12 +576,14 @@ func (w *worker) onCreateIndex(d *ddlCtx, t *meta.Meta, job *model.Job, isPK boo
 			tblInfo.Columns,
 			indexName,
 			isPK,
+			fulltext,
 			unique,
 			global,
 			indexPartSpecifications,
 			indexOption,
 			model.StateNone,
 		)
+		// fmt.Printf("		[onCreateIndex] BuildIndexInfo, index name = %v, fulltext = %v\n", indexInfo.Name, indexInfo.FullText)
 		if err != nil {
 			job.State = model.JobStateCancelled
 			return ver, errors.Trace(err)
@@ -1515,14 +1523,37 @@ func (w *addIndexWorker) BackfillDataInTxn(handleRange reorgBackfillTask) (taskC
 
 			// Create the index.
 			if w.writerCtx == nil {
-				handle, err := w.index.Create(w.sessCtx, txn, idxRecord.vals, idxRecord.handle, idxRecord.rsData, table.WithIgnoreAssertion, table.FromBackfill)
-				if err != nil {
-					if kv.ErrKeyExists.Equal(err) && idxRecord.handle.Equal(handle) {
-						// Index already exists, skip it.
-						continue
-					}
+				var (
+					handle kv.Handle
+					err    error
+				)
+				if w.index.Meta().FullText {
+					words := parser.Jieba.Cut(idxRecord.vals[0].GetString(), true)
+					fmt.Println("len(words) = ", len(words))
+					for i, word := range words {
+						vals := make([]types.Datum, 1)
+						fmt.Printf("[BackfillDataInTxn] word[%v] = %v\n", i, word)
+						vals[0] = types.NewDatum(word)
+						handle, err = w.index.Create(w.sessCtx, txn, vals, idxRecord.handle, idxRecord.rsData, table.WithIgnoreAssertion, table.FromBackfill)
+						if err != nil {
+							if kv.ErrKeyExists.Equal(err) && idxRecord.handle.Equal(handle) {
+								// Index already exists, skip it.
+								continue
+							}
 
-					return errors.Trace(err)
+							return errors.Trace(err)
+						}
+					}
+				} else {
+					handle, err = w.index.Create(w.sessCtx, txn, idxRecord.vals, idxRecord.handle, idxRecord.rsData, table.WithIgnoreAssertion, table.FromBackfill)
+					if err != nil {
+						if kv.ErrKeyExists.Equal(err) && idxRecord.handle.Equal(handle) {
+							// Index already exists, skip it.
+							continue
+						}
+
+						return errors.Trace(err)
+					}
 				}
 			} else { // The lightning environment is ready.
 				vars := w.sessCtx.GetSessionVars()
