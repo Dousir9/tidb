@@ -27,6 +27,7 @@ import (
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/expression/aggregation"
 	"github.com/pingcap/tidb/infoschema"
+	"github.com/pingcap/tidb/parser"
 	"github.com/pingcap/tidb/parser/ast"
 	"github.com/pingcap/tidb/parser/charset"
 	"github.com/pingcap/tidb/parser/model"
@@ -1220,6 +1221,8 @@ func (er *expressionRewriter) Leave(originInNode ast.Node) (retNode ast.Node, ok
 		if v.Sel == nil {
 			er.inToExpression(len(v.List), v.Not, &v.Type)
 		}
+	case *ast.MatchAgainst:
+		er.handleMatchAgainst(v)
 	case *ast.PositionExpr:
 		er.positionToScalarFunc(v)
 	case *ast.IsNullExpr:
@@ -1522,6 +1525,74 @@ func (er *expressionRewriter) isTrueToScalarFunc(v *ast.IsTruthExpr) {
 	}
 	function := er.notToExpression(v.Not, op, &v.Type, er.ctxStack[stkLen-1])
 	er.ctxStackPop(1)
+	er.ctxStackAppend(function, types.EmptyName)
+}
+
+// handleMatchAgainst converts `Match Again` expression to scalar function.
+// if the length of Match field
+func (er *expressionRewriter) handleMatchAgainst(expr *ast.MatchAgainst) {
+	stkLen := len(er.ctxStack)
+	// calculate the stack length of the MatchAgainst expression
+	exprLen := len(expr.ColumnNames) + 1
+	fields := er.ctxStack[stkLen-exprLen : stkLen-1]
+	pattern := er.ctxStack[stkLen-1]
+
+	var function expression.Expression
+	patternStr := pattern.(*expression.Constant).Value.GetString()
+	if expr.Modifier.IsBooleanMode() {
+		andTree := make([]expression.Expression, 0, len(fields))
+		ops := strings.Split(patternStr, " ")
+		for _, field := range fields {
+			eqFunctions := make([]expression.Expression, 0, len(ops))
+			for _, op := range ops {
+				patternExpr := &expression.Constant{
+					Value:   types.NewStringDatum(op[1:]),
+					RetType: pattern.(*expression.Constant).RetType,
+				}
+				switch op[0] {
+				case '+':
+					expr, err := er.constructBinaryOpFunction(field, patternExpr, ast.EQ)
+					if err != nil {
+						er.err = err
+						return
+					}
+					eqFunctions = append(eqFunctions, expr)
+				case '-':
+					expr, err := er.constructBinaryOpFunction(field, patternExpr, ast.NE)
+					if err != nil {
+						er.err = err
+						return
+					}
+					eqFunctions = append(eqFunctions, expr)
+				default:
+					continue
+				}
+			}
+			andTree = append(andTree, expression.ComposeCNFCondition(er.sctx, eqFunctions...))
+		}
+		function = expression.ComposeDNFCondition(er.sctx, andTree...)
+	} else {
+		segItems := parser.Jieba.Cut(patternStr, true)
+		if expr.Modifier.IsNaturalLanguageMode() {
+			eqFunctions := make([]expression.Expression, 0, (exprLen-1)*len(segItems))
+			for _, field := range fields {
+				for _, segItem := range segItems {
+					patternExpr := &expression.Constant{
+						Value:   types.NewStringDatum(segItem),
+						RetType: pattern.(*expression.Constant).RetType,
+					}
+					expr, err := er.constructBinaryOpFunction(field, patternExpr, ast.EQ)
+					if err != nil {
+						er.err = err
+						return
+					}
+					eqFunctions = append(eqFunctions, expr)
+				}
+			}
+			function = expression.ComposeDNFCondition(er.sctx, eqFunctions...)
+		}
+	}
+	er.ctxStackPop(exprLen)
 	er.ctxStackAppend(function, types.EmptyName)
 }
 
