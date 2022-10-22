@@ -1529,10 +1529,10 @@ func (w *addIndexWorker) BackfillDataInTxn(handleRange reorgBackfillTask) (taskC
 				)
 				if w.index.Meta().FullText {
 					words := parser.Jieba.Cut(idxRecord.vals[0].GetString(), true)
-					fmt.Println("len(words) = ", len(words))
-					for i, word := range words {
+					// fmt.Println("len(words) = ", len(words))
+					for _, word := range words {
 						vals := make([]types.Datum, 1)
-						fmt.Printf("[BackfillDataInTxn] word[%v] = %v\n", i, word)
+						// fmt.Printf("[BackfillDataInTxn] word[%v] = %v\n", i, word)
 						vals[0] = types.NewDatum(word)
 						handle, err = w.index.Create(w.sessCtx, txn, vals, idxRecord.handle, idxRecord.rsData, table.WithIgnoreAssertion, table.FromBackfill)
 						if err != nil {

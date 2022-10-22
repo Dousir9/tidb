@@ -365,6 +365,7 @@ func (d SchemaTracker) createIndex(
 	ifNotExists bool,
 ) error {
 	unique := keyType == ast.IndexKeyTypeUnique
+	fulltext := keyType == ast.IndexKeyTypeFullText
 	tblInfo, err := d.TableByName(ti.Schema, ti.Name)
 	if err != nil {
 		return err
@@ -404,6 +405,7 @@ func (d SchemaTracker) createIndex(
 		finalColumns,
 		indexName,
 		false,
+		fulltext,
 		unique,
 		false,
 		indexPartSpecifications,
@@ -829,6 +831,7 @@ func (d SchemaTracker) createPrimaryKey(
 		tblInfo.Columns,
 		indexName,
 		true,
+		false,
 		true,
 		false,
 		indexPartSpecifications,
