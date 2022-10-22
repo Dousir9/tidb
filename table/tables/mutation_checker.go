@@ -245,6 +245,10 @@ func checkIndexKeys(
 			indexData = append(indexData, datum)
 		}
 
+		if indexInfo.FullText {
+			continue
+		}
+
 		// When it is in add index new backfill state.
 		if len(value) == 0 || (idxID != m.indexID && (bytes.Equal(value, []byte("deleteu")) || bytes.Equal(value, []byte("delete")))) {
 			err = compareIndexData(sessVars.StmtCtx, t.Columns, indexData, rowToRemove, indexInfo, t.Meta())

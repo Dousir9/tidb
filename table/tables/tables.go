@@ -33,6 +33,7 @@ import (
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/meta"
 	"github.com/pingcap/tidb/meta/autoid"
+	"github.com/pingcap/tidb/parser"
 	"github.com/pingcap/tidb/parser/model"
 	"github.com/pingcap/tidb/parser/mysql"
 	"github.com/pingcap/tidb/sessionctx"
@@ -978,11 +979,31 @@ func (t *TableCommon) addIndices(sctx sessionctx.Context, recordID kv.Handle, r 
 			dupErr = kv.ErrKeyExists.FastGenByArgs(entryKey, fmt.Sprintf("%s.%s", v.TableMeta().Name.String(), v.Meta().Name.String()))
 		}
 		rsData := TryGetHandleRestoredDataWrapper(t, r, nil, v.Meta())
-		if dupHandle, err := v.Create(sctx, txn, indexVals, recordID, rsData, opts...); err != nil {
-			if kv.ErrKeyExists.Equal(err) {
-				return dupHandle, dupErr
+
+		if v.Meta().FullText {
+			words := parser.Jieba.CutForSearch(indexVals[0].GetString(), true)
+			words = append(words, indexVals[0].GetString())
+			// words = make([]string, 1)
+			// words[0] = indexVals[0].GetString()
+			fmt.Println("[addIndices] len(words) = ", len(words))
+			for i, word := range words {
+				vals := make([]types.Datum, 1)
+				fmt.Printf("[addIndices] word[%v] = %v\n", i, word)
+				vals[0] = types.NewDatum(word)
+				if dupHandle, err := v.Create(sctx, txn, vals, recordID, rsData, opts...); err != nil {
+					if kv.ErrKeyExists.Equal(err) {
+						return dupHandle, dupErr
+					}
+					return nil, err
+				}
 			}
-			return nil, err
+		} else {
+			if dupHandle, err := v.Create(sctx, txn, indexVals, recordID, rsData, opts...); err != nil {
+				if kv.ErrKeyExists.Equal(err) {
+					return dupHandle, dupErr
+				}
+				return nil, err
+			}
 		}
 	}
 	// save the buffer, multi rows insert can use it.
