@@ -430,3 +430,33 @@ func TestBitFuncsReturnType(t *testing.T) {
 		tk.MustQuery("explain format = 'brief' " + tt).Check(testkit.Rows(output[i].Plan...))
 	}
 }
+
+func TestMatchAgainstNaturalMode(t *testing.T) {
+	store := testkit.CreateMockStore(t)
+	tk := testkit.NewTestKit(t, store)
+	tk.MustExec("use test;")
+	tk.MustExec("drop table if exists t1")
+	// don't index any field, it just tests the rewrite process.
+	tk.MustExec("create table t1 (id int, doc char(100))")
+	tk.MustExec("insert into t1 values(1, 'test'), (2, 'ask'), (3, 'east'), (4, 'eat')")
+	tk.MustQuery("select * from t1 where Match(`doc`) AGAINST('test' IN NATURAL LANGUAGE MODE);").Check(
+		testkit.Rows("1 test"))
+	tk.MustQuery("select * from t1 where Match(`doc`) AGAINST('ask' IN NATURAL LANGUAGE MODE);").Check(
+		testkit.Rows("2 ask"))
+	tk.MustExec("insert into t1 values(5, '比特币'), (6, '比特'), (7, '币')")
+	tk.MustQuery("select * from t1 where Match(`doc`) AGAINST('比特币' IN NATURAL LANGUAGE MODE)").Check(
+		testkit.Rows("6 比特", "7 币"))
+}
+func TestMatchAgainstStrictMode(t *testing.T) {
+	store := testkit.CreateMockStore(t)
+	tk := testkit.NewTestKit(t, store)
+	tk.MustExec("use test;")
+	tk.MustExec("drop table if exists t1")
+	// don't index any field, it just tests the rewrite process.
+	tk.MustExec("create table t1 (id int, doc char(100))")
+	tk.MustExec("insert into t1 values(1, '知识'), (2, '芝士'), (3, '雪豹'), (4, 'eat')")
+	tk.MustExec("create FULLTEXT index idx1 on t1(doc);")
+	// tk.MustQuery("explain select /*+ USE_INDEX(t1, idx1) */ * from t1 where Match(`doc`) AGAINST('知识' IN STRICT MODE);").Check(testkit.Rows((" ")))
+	tk.MustQuery("select /*+ USE_INDEX(t1, idx1) */ * from t1 where Match(`doc`) AGAINST('知识' IN STRICT MODE);").Check(
+		testkit.Rows("1 知识"))
+}

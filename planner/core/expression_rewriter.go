@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -1573,9 +1574,10 @@ func (er *expressionRewriter) handleMatchAgainst(expr *ast.MatchAgainst) {
 			andTree = append(andTree, expression.ComposeCNFCondition(er.sctx, eqFunctions...))
 		}
 		function = expression.ComposeDNFCondition(er.sctx, andTree...)
-	} else if expr.Modifier.IsNaturalLanguageMode() {
+	} else {
 		// isExpansion := expr.Modifier.WithQueryExpansion()
-		segItems := parser.Jieba.Cut(patternStr, true)
+		segItems := parser.CutForSearch(patternStr)
+		fmt.Println(len(segItems), segItems)
 		eqFunctions := make([]expression.Expression, 0, (exprLen-1)*len(segItems))
 		for _, field := range fields {
 			for _, segItem := range segItems {
@@ -1591,7 +1593,12 @@ func (er *expressionRewriter) handleMatchAgainst(expr *ast.MatchAgainst) {
 				eqFunctions = append(eqFunctions, expr)
 			}
 		}
-		function = expression.ComposeDNFCondition(er.sctx, eqFunctions...)
+		if expr.Modifier.IsNaturalLanguageMode() {
+			function = expression.ComposeDNFCondition(er.sctx, eqFunctions...)
+		} else { // strict mode
+			fmt.Println("{}", eqFunctions)
+			function = expression.ComposeCNFCondition(er.sctx, eqFunctions...)
+		}
 	}
 	er.ctxStackPop(exprLen)
 	er.ctxStackAppend(function, types.EmptyName)

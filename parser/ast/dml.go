@@ -3632,6 +3632,7 @@ const (
 	FulltextSearchModifierBooleanMode         = 1
 	FulltextSearchModifierModeMask            = 0xF
 	FulltextSearchModifierWithQueryExpansion  = 1 << 4
+	FulltextSearchModifierStrictMode          = 2
 )
 
 func (m FulltextSearchModifier) IsBooleanMode() bool {
@@ -3644,6 +3645,10 @@ func (m FulltextSearchModifier) IsNaturalLanguageMode() bool {
 
 func (m FulltextSearchModifier) WithQueryExpansion() bool {
 	return m&FulltextSearchModifierWithQueryExpansion == FulltextSearchModifierWithQueryExpansion
+}
+
+func (m FulltextSearchModifier) IsStrictMode() bool {
+	return m&FulltextSearchModifierStrictMode == FulltextSearchModifierStrictMode
 }
 
 type AsOfClause struct {

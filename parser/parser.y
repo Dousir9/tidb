@@ -5513,6 +5513,14 @@ FulltextSearchModifierOpt:
 	{
 		$$ = ast.FulltextSearchModifierWithQueryExpansion
 	}
+|	"IN" "STRICT" "MODE"
+	{
+		$$ = ast.FulltextSearchModifierStrictMode
+	}
+|	"IN" "STRICT" "MODE" "WITH" "QUERY" "EXPANSION"
+	{
+		$$ = ast.FulltextSearchModifierStrictMode | ast.FulltextSearchModifierWithQueryExpansion
+	}
 
 logOr:
 	pipesAsOr
