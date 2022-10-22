@@ -14,8 +14,16 @@ var (
 )
 
 func Cutl(sentence string) []string {
+	return removeStopwords(Jieba.Cut(sentence, true))
+}
+
+func CutForSearch(sentence string) []string {
+	return removeStopwords(Jieba.CutForSearch(sentence, true))
+}
+
+func removeStopwords(input []string) []string {
 	cut_res := make([]string, 2)
-	for _, word := range Jieba.Cut(sentence, true) {
+	for _, word := range input {
 		_, exists := stopWordSet[word]
 		if !exists {
 			cut_res = append(cut_res, word)
