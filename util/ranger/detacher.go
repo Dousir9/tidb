@@ -15,6 +15,7 @@
 package ranger
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/pingcap/errors"
@@ -271,8 +272,9 @@ func (d *rangeDetacher) detachCNFCondAndBuildRangeForIndex(conditions []expressi
 		err     error
 	)
 	res := &DetachRangeResult{}
-
+	fmt.Println("build", conditions, d.cols)
 	accessConds, filterConds, newConditions, columnValues, emptyRange := ExtractEqAndInCondition(d.sctx, conditions, d.cols, d.lengths)
+	fmt.Println(accessConds, newConditions, emptyRange)
 	if emptyRange {
 		return res, nil
 	}
@@ -618,10 +620,10 @@ func ExtractEqAndInCondition(sctx sessionctx.Context, conditions []expression.Ex
 				// Maybe we can improve it later.
 				columnValues[i] = &valueInfo{mutable: true}
 			}
-			if expression.MaybeOverOptimized4PlanCache(sctx, conditions) {
-				// `a=@x and a=@y` --> `a=@x if @x==@y`
-				sctx.GetSessionVars().StmtCtx.SkipPlanCache = true
-			}
+			// if expression.MaybeOverOptimized4PlanCache(sctx, conditions) {
+			// 	// `a=@x and a=@y` --> `a=@x if @x==@y`
+			// 	sctx.GetSessionVars().StmtCtx.SkipPlanCache = true
+			// }
 		}
 	}
 	for i, offset := range offsets {

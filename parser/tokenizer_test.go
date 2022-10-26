@@ -11,5 +11,5 @@ func TestTokenizerInit(t *testing.T) {
 }
 
 func TestSimWord(t *testing.T) {
-	fmt.Println(SimWord("快乐"))
+	fmt.Println(CutForSearchWithExpansion("酒店"))
 }

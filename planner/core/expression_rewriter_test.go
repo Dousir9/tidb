@@ -453,10 +453,10 @@ func TestMatchAgainstStrictMode(t *testing.T) {
 	tk.MustExec("use test;")
 	tk.MustExec("drop table if exists t1")
 	// don't index any field, it just tests the rewrite process.
-	tk.MustExec("create table t1 (id int, doc char(100))")
-	tk.MustExec("insert into t1 values(1, '知识'), (2, '芝士'), (3, '雪豹'), (4, 'eat')")
+	tk.MustExec("create table t1 (id int primary key, doc char(100), other int)")
+	tk.MustExec("insert into t1 values(1, '橘子酒店', 1), (2, '橘子民宿', 2), (3, '橘子公寓', 3);")
 	tk.MustExec("create FULLTEXT index idx1 on t1(doc);")
 	// tk.MustQuery("explain select /*+ USE_INDEX(t1, idx1) */ * from t1 where Match(`doc`) AGAINST('知识' IN STRICT MODE);").Check(testkit.Rows((" ")))
-	tk.MustQuery("select /*+ USE_INDEX(t1, idx1) */ * from t1 where Match(`doc`) AGAINST('知识' IN STRICT MODE);").Check(
-		testkit.Rows("1 知识"))
+	tk.MustQuery("select  * from t1 where Match(doc) Against('酒店' IN NATURAL LANGUAGE MODE WITH QUERY EXPANSION);").Check(
+		testkit.Rows("1 知识雪豹"))
 }

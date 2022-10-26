@@ -803,6 +803,14 @@ func TestColumnRange(t *testing.T) {
 			resultStr:   "[[NULL,NULL]]",
 			length:      types.UnspecifiedLength,
 		},
+		{
+			colPos:      0,
+			exprStr:     "a = 1 and a = 2",
+			accessConds: "[eq(test.t.a, 1) eq(test.t.a, 2)]",
+			filterConds: "",
+			resultStr:   "[]",
+			length:      types.UnspecifiedLength,
+		},
 	}
 
 	ctx := context.Background()

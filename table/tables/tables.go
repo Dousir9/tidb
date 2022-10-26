@@ -981,14 +981,14 @@ func (t *TableCommon) addIndices(sctx sessionctx.Context, recordID kv.Handle, r 
 		rsData := TryGetHandleRestoredDataWrapper(t, r, nil, v.Meta())
 
 		if v.Meta().FullText {
-			words := parser.CutForSearchWithExpansion(indexVals[0].GetString())
+			words := parser.CutForSearch(indexVals[0].GetString())
 			words = append(words, indexVals[0].GetString())
 			// words = make([]string, 1)
 			// words[0] = indexVals[0].GetString()
-			fmt.Println("[addIndices] len(words) = ", len(words))
-			for i, word := range words {
+			// fmt.Println("[addIndices] len(words) = ", len(words))
+			for _, word := range words {
 				vals := make([]types.Datum, 1)
-				fmt.Printf("[addIndices] word[%v] = %v\n", i, word)
+				// fmt.Printf("[addIndices] word[%v] = %v\n", i, word)
 				vals[0] = types.NewDatum(word)
 				if dupHandle, err := v.Create(sctx, txn, vals, recordID, rsData, opts...); err != nil {
 					if kv.ErrKeyExists.Equal(err) {

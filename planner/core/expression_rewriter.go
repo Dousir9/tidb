@@ -1573,9 +1573,10 @@ func (er *expressionRewriter) handleMatchAgainst(expr *ast.MatchAgainst) {
 			}
 			andTree = append(andTree, expression.ComposeCNFCondition(er.sctx, eqFunctions...))
 		}
-		function = expression.ComposeDNFCondition(er.sctx, andTree...)
+		function = expression.ComposeCNFCondition(er.sctx, andTree...)
 	} else {
 		var segItems []string
+		fmt.Println(expr.Modifier.WithQueryExpansion())
 		if !expr.Modifier.WithQueryExpansion() {
 			segItems = parser.CutForSearch(patternStr)
 		} else {
@@ -1601,7 +1602,18 @@ func (er *expressionRewriter) handleMatchAgainst(expr *ast.MatchAgainst) {
 			function = expression.ComposeDNFCondition(er.sctx, eqFunctions...)
 		} else { // strict mode
 			fmt.Println("{}", eqFunctions)
-			function = expression.ComposeCNFCondition(er.sctx, eqFunctions...)
+			function = expression.ComposeDNFCondition(er.sctx, eqFunctions...)
+			regrexFuncs := make([]expression.Expression, 0)
+			for _, word := range segItems {
+				// patValue, _ := stringutil.CompilePattern(fmt.Sprint("%", word, '%'), '/')
+				regrexFunc := er.notToExpression(false, ast.Regexp, pattern.(*expression.Constant).RetType, fields[0], &expression.Constant{
+					Value:   types.NewStringDatum(fmt.Sprint("%", word, "%")),
+					RetType: pattern.(*expression.Constant).RetType,
+				})
+				regrexFuncs = append(regrexFuncs, regrexFunc)
+			}
+			regrexFunc := expression.ComposeCNFCondition(er.sctx, regrexFuncs...)
+			function = expression.ComposeCNFCondition(er.sctx, function, regrexFunc)
 		}
 	}
 	er.ctxStackPop(exprLen)

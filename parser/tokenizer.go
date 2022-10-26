@@ -15,8 +15,9 @@ var (
 	stopWordSet  = loadStopWords()
 	forwardDict  = loadModel("tidb_hackathon_forwards.json")
 	backwardDict = loadModel("tidb_hackathon_backwards.json")
-	thredhold    = 0.8
+	thredhold    = 100
 	basePath     = "/home/dousir9/TiDB-Hackathon/tidb_hackathon_2022/parser/"
+	userDict     = loadUserDict()
 )
 
 func Cutl(sentence string) []string {
@@ -28,6 +29,9 @@ func CutForSearch(sentence string) []string {
 }
 
 func CutForSearchWithExpansion(sentence string) []string {
+	if len(sentence) > thredhold {
+		return Jieba.Extract(sentence, 5)
+	}
 	cutRes := removeStopwords(Jieba.CutForSearch(sentence, true))
 	for _, cut := range cutRes {
 		simWords := SimWord(cut)
@@ -83,6 +87,9 @@ func loadModel(path string) map[string]map[string]float64 {
 
 func SimWord(word string) []string {
 	candidate_set := make([]string, 0)
+	if simSet, exists := userDict[word]; exists {
+		return simSet
+	}
 	// forward
 	wordForward, exists := forwardDict[word]
 	if exists {
@@ -116,4 +123,10 @@ func getSimWord(transDict map[string]float64) (simWord string, simScore float64)
 		}
 	}
 	return
+}
+
+func loadUserDict() map[string][]string {
+	userDict := make(map[string][]string)
+	userDict["酒店"] = []string{"宾馆", "民宿", "公寓"}
+	return userDict
 }

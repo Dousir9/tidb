@@ -536,7 +536,9 @@ func (d *rangeDetacher) buildRangeOnColsByCNFCond(newTp []*types.FieldType, eqAn
 // buildCNFIndexRange builds the range for index where the top layer is CNF.
 func (d *rangeDetacher) buildCNFIndexRange(newTp []*types.FieldType, eqAndInCount int,
 	accessConds []expression.Expression) (Ranges, []expression.Expression, []expression.Expression, error) {
+	// fmt.Println("accessConds:", accessConds)
 	ranges, newAccessConds, remainedConds, err := d.buildRangeOnColsByCNFCond(newTp, eqAndInCount, accessConds)
+	// fmt.Println("range result: ", ranges, newAccessConds, remainedConds)
 	if err != nil {
 		return nil, nil, nil, err
 	}
